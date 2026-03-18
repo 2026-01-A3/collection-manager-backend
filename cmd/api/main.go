@@ -1,12 +1,14 @@
-﻿package main
+package main
 
 import (
 	"log"
+	"time"
 
 	"collection-manager-backend/internal/database"
 	"collection-manager-backend/internal/routes"
 	"collection-manager-backend/internal/storage"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
@@ -26,6 +28,15 @@ func main() {
 	}
 
 	router := gin.Default()
+
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:4200"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 
 	routes.RegisterCategoryRoutes(router)
 
