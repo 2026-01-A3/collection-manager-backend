@@ -2,8 +2,10 @@ package main
 
 import (
 	"log"
+	"os"
 	"time"
 
+	"collection-manager-backend/internal/auth"
 	"collection-manager-backend/internal/database"
 	"collection-manager-backend/internal/routes"
 	"collection-manager-backend/internal/storage"
@@ -18,6 +20,13 @@ func main() {
 		log.Println("aviso: arquivo .env não carregado, usando variáveis de ambiente do sistema")
 	}
 
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		log.Fatal("JWT_SECRET não definida")
+	}
+
+	auth.InitJWTSecret(secret)
+
 	db, err := database.NewDB()
 	if err != nil {
 		log.Fatalf("erro ao conectar no banco: %v", err)
@@ -25,6 +34,10 @@ func main() {
 
 	if err := storage.InitCategoryStorage(db); err != nil {
 		log.Fatalf("erro ao inicializar storage de categorias: %v", err)
+	}
+
+	if err := storage.InitUserStorage(db); err != nil {
+		log.Fatalf("erro ao inicializar storage de usuários: %v", err)
 	}
 
 	router := gin.Default()
@@ -39,6 +52,7 @@ func main() {
 	}))
 
 	routes.RegisterCategoryRoutes(router)
+	routes.RegisterAuthRoutes(router)
 
 	if err := router.Run(":8080"); err != nil {
 		log.Fatalf("erro ao iniciar servidor: %v", err)
