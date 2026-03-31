@@ -4,15 +4,17 @@ import (
 	"net/http"
 
 	"collection-manager-backend/internal/auth"
+	"collection-manager-backend/internal/models"
 	"collection-manager-backend/internal/storage"
 
 	"github.com/gin-gonic/gin"
 )
 
 type RegisterRequest struct {
-	Name     string `json:"name" binding:"required"`
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=6"`
+	Name     string      `json:"name" binding:"required"`
+	Email    string      `json:"email" binding:"required,email"`
+	Password string      `json:"password" binding:"required,min=6"`
+	Role     models.Role `json:"role"`
 }
 
 type LoginRequest struct {
@@ -27,7 +29,7 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	user, err := storage.CreateUser(c.Request.Context(), req.Name, req.Email, req.Password)
+	user, err := storage.CreateUser(c.Request.Context(), req.Name, req.Email, req.Password, req.Role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "erro ao criar usuário"})
 		return
@@ -54,7 +56,7 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	token, err := auth.GenerateToken(user.ID, user.Email)
+	token, err := auth.GenerateToken(user.ID, user.Email, user.Role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "erro ao gerar token"})
 		return

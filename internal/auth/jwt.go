@@ -4,6 +4,8 @@ import (
 	"errors"
 	"time"
 
+	"collection-manager-backend/internal/models"
+
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -21,16 +23,18 @@ func getJWTSecret() (string, error) {
 }
 
 type Claims struct {
-	UserID uint   `json:"user_id"`
-	Email  string `json:"email"`
+	UserID uint        `json:"user_id"`
+	Email  string      `json:"email"`
+	Role   models.Role `json:"role"`
 	jwt.RegisteredClaims
 }
 
-func GenerateToken(userID uint, email string) (string, error) {
+func GenerateToken(userID uint, email string, role models.Role) (string, error) {
 	expirationTime := time.Now().Add(24 * time.Hour)
 	claims := &Claims{
 		UserID: userID,
 		Email:  email,
+		Role:   role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

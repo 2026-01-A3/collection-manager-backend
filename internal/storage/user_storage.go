@@ -17,9 +17,13 @@ func InitUserStorage(db *gorm.DB) error {
 	return userDB.AutoMigrate(&models.User{})
 }
 
-func CreateUser(ctx context.Context, name, email, password string) (models.User, error) {
+func CreateUser(ctx context.Context, name, email, password string, role models.Role) (models.User, error) {
 	if userDB == nil {
 		return models.User{}, errors.New("conexão com o banco não inicializada")
+	}
+
+	if role == "" {
+		role = models.UserRole
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -31,6 +35,7 @@ func CreateUser(ctx context.Context, name, email, password string) (models.User,
 		Name:     name,
 		Email:    email,
 		Password: string(hashedPassword),
+		Role:     role,
 	}
 
 	if err := userDB.WithContext(ctx).Create(&user).Error; err != nil {

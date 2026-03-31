@@ -7,12 +7,14 @@ import (
 
 	"collection-manager-backend/internal/auth"
 	"collection-manager-backend/internal/database"
+	"collection-manager-backend/internal/models"
 	"collection-manager-backend/internal/routes"
 	"collection-manager-backend/internal/storage"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -40,6 +42,8 @@ func main() {
 		log.Fatalf("erro ao inicializar storage de usuários: %v", err)
 	}
 
+	createInitialAdmin(db)
+
 	router := gin.Default()
 
 	router.Use(cors.New(cors.Config{
@@ -56,5 +60,19 @@ func main() {
 
 	if err := router.Run(":8080"); err != nil {
 		log.Fatalf("erro ao iniciar servidor: %v", err)
+	}
+}
+
+func createInitialAdmin(db *gorm.DB) {
+	var count int64
+	db.Model(&models.User{}).Where("role = ?", models.AdminRole).Count(&count)
+	if count == 0 {
+		log.Println("Criando usuário admin inicial...")
+		_, err := storage.CreateUser(nil, "Admin", "admin@example.com", "admin123", models.AdminRole)
+		if err != nil {
+			log.Printf("Erro ao criar admin inicial: %v", err)
+		} else {
+			log.Println("Usuário admin inicial criado com sucesso: admin@example.com / admin123")
+		}
 	}
 }
