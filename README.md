@@ -60,3 +60,5 @@ migrate -source file://migrations -database "postgres://user:pwd@localhost:5433/
 ```
 
 > **Dica:** Você pode substituir a string de conexão pela variável de ambiente configurada no seu terminal se preferir.
+
+teste
