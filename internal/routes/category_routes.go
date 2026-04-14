@@ -13,5 +13,7 @@ func RegisterCategoryRoutes(router *gin.Engine) {
 	{
 		categoryGroup.POST("", handlers.CreateCategory)
 		categoryGroup.GET("", handlers.GetCategories)
+		categoryGroup.PUT("/:id", handlers.UpdateCategory)
+		categoryGroup.DELETE("/:id", handlers.DeleteCategory)
 	}
 }
