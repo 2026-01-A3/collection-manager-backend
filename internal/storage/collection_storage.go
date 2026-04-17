@@ -17,7 +17,13 @@ func InitCollectionStorage(db *gorm.DB) error {
 	return collectionDB.AutoMigrate(&models.Collection{})
 }
 
-func AddCollection(ctx context.Context, name string, categoryID int, imageURL string) (models.Collection, error) {
+type BinaryObjectPayload struct {
+	Base64    string
+	Filename  string
+	Extension string
+}
+
+func AddCollection(ctx context.Context, name string, categoryID int, bin *BinaryObjectPayload) (models.Collection, error) {
 	if collectionDB == nil {
 		return models.Collection{}, errors.New("conexão com o banco não inicializada")
 	}
@@ -25,15 +31,24 @@ func AddCollection(ctx context.Context, name string, categoryID int, imageURL st
 	collection := models.Collection{
 		Name:       name,
 		CategoryID: categoryID,
-		ImageURL:   imageURL,
+	}
+
+	if bin != nil {
+		saved, err := AddBinaryObject(ctx, bin.Base64, bin.Filename, bin.Extension)
+		if err != nil {
+			return models.Collection{}, err
+		}
+		collection.BinaryObjectID = &saved.ID
 	}
 
 	if err := collectionDB.WithContext(ctx).Create(&collection).Error; err != nil {
 		return models.Collection{}, err
 	}
 
-	// Carrega a categoria após a criação
-	if err := collectionDB.WithContext(ctx).Preload("Category").First(&collection, collection.ID).Error; err != nil {
+	if err := collectionDB.WithContext(ctx).
+		Preload("Category").
+		Preload("BinaryObject").
+		First(&collection, collection.ID).Error; err != nil {
 		return collection, err
 	}
 
@@ -49,6 +64,7 @@ func GetCollections(ctx context.Context) ([]models.Collection, error) {
 
 	if err := collectionDB.WithContext(ctx).
 		Preload("Category").
+		Preload("BinaryObject").
 		Order("id ASC").
 		Find(&collections).Error; err != nil {
 		return nil, err
@@ -57,7 +73,7 @@ func GetCollections(ctx context.Context) ([]models.Collection, error) {
 	return collections, nil
 }
 
-func UpdateCollection(ctx context.Context, id int, name string, categoryID int, imageURL string) (models.Collection, error) {
+func UpdateCollection(ctx context.Context, id int, name string, categoryID int, bin *BinaryObjectPayload) (models.Collection, error) {
 	if collectionDB == nil {
 		return models.Collection{}, errors.New("conexão com o banco não inicializada")
 	}
@@ -72,14 +88,31 @@ func UpdateCollection(ctx context.Context, id int, name string, categoryID int, 
 
 	collection.Name = name
 	collection.CategoryID = categoryID
-	collection.ImageURL = imageURL
+
+	if bin != nil {
+		if collection.BinaryObjectID != nil {
+			updated, err := UpdateBinaryObject(ctx, *collection.BinaryObjectID, bin.Base64, bin.Filename, bin.Extension)
+			if err != nil {
+				return models.Collection{}, err
+			}
+			collection.BinaryObjectID = &updated.ID
+		} else {
+			saved, err := AddBinaryObject(ctx, bin.Base64, bin.Filename, bin.Extension)
+			if err != nil {
+				return models.Collection{}, err
+			}
+			collection.BinaryObjectID = &saved.ID
+		}
+	}
 
 	if err := collectionDB.WithContext(ctx).Save(&collection).Error; err != nil {
 		return models.Collection{}, err
 	}
 
-	// Carrega a categoria após a atualização
-	if err := collectionDB.WithContext(ctx).Preload("Category").First(&collection, collection.ID).Error; err != nil {
+	if err := collectionDB.WithContext(ctx).
+		Preload("Category").
+		Preload("BinaryObject").
+		First(&collection, collection.ID).Error; err != nil {
 		return collection, err
 	}
 
@@ -99,8 +132,16 @@ func DeleteCollection(ctx context.Context, id int) error {
 		return err
 	}
 
+	binID := collection.BinaryObjectID
+
 	if err := collectionDB.WithContext(ctx).Delete(&collection).Error; err != nil {
 		return err
+	}
+
+	if binID != nil {
+		if err := DeleteBinaryObject(ctx, *binID); err != nil {
+			return err
+		}
 	}
 
 	return nil

@@ -38,6 +38,10 @@ func main() {
 		log.Fatalf("erro ao inicializar storage de categorias: %v", err)
 	}
 
+	if err := storage.InitBinaryObjectStorage(db); err != nil {
+		log.Fatalf("erro ao inicializar storage de arquivos: %v", err)
+	}
+
 	if err := storage.InitCollectionStorage(db); err != nil {
 		log.Fatalf("erro ao inicializar storage de coleções: %v", err)
 	}
