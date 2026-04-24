@@ -46,6 +46,10 @@ func main() {
 		log.Fatalf("erro ao inicializar storage de coleções: %v", err)
 	}
 
+	if err := storage.InitItemStorage(db); err != nil {
+		log.Fatalf("erro ao inicializar storage de itens: %v", err)
+	}
+
 	if err := storage.InitUserStorage(db); err != nil {
 		log.Fatalf("erro ao inicializar storage de usuários: %v", err)
 	}
@@ -65,6 +69,7 @@ func main() {
 
 	routes.RegisterCategoryRoutes(router)
 	routes.RegisterCollectionRoutes(router)
+	routes.RegisterItemRoutes(router)
 	routes.RegisterAuthRoutes(router)
 
 	if err := router.Run(":8080"); err != nil {
