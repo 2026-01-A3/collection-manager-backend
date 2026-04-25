@@ -17,12 +17,12 @@ func InitItemStorage(db *gorm.DB) error {
 	return itemDB.AutoMigrate(&models.Item{})
 }
 
-func AddItem(ctx context.Context, userID uint, name string, price float64, collectionID int, bin *BinaryObjectPayload) (models.Item, error) {
+func AddItem(ctx context.Context, userID uint, isAdmin bool, name string, price float64, collectionID int, bin *BinaryObjectPayload) (models.Item, error) {
 	if itemDB == nil {
 		return models.Item{}, errors.New("conexão com o banco não inicializada")
 	}
 
-	owns, err := CollectionBelongsToUser(ctx, userID, collectionID)
+	owns, err := CollectionAccessible(ctx, userID, isAdmin, collectionID)
 	if err != nil {
 		return models.Item{}, err
 	}
@@ -58,12 +58,12 @@ func AddItem(ctx context.Context, userID uint, name string, price float64, colle
 	return item, nil
 }
 
-func GetItemsByCollection(ctx context.Context, userID uint, collectionID int) ([]models.Item, error) {
+func GetItemsByCollection(ctx context.Context, userID uint, isAdmin bool, collectionID int) ([]models.Item, error) {
 	if itemDB == nil {
 		return nil, errors.New("conexão com o banco não inicializada")
 	}
 
-	owns, err := CollectionBelongsToUser(ctx, userID, collectionID)
+	owns, err := CollectionAccessible(ctx, userID, isAdmin, collectionID)
 	if err != nil {
 		return nil, err
 	}
@@ -73,33 +73,32 @@ func GetItemsByCollection(ctx context.Context, userID uint, collectionID int) ([
 
 	var items []models.Item
 
-	if err := itemDB.WithContext(ctx).
+	tx := itemDB.WithContext(ctx).
 		Preload("BinaryObject").
-		Where("collection_id = ? AND user_id = ?", collectionID, userID).
-		Order("id ASC").
-		Find(&items).Error; err != nil {
+		Where("collection_id = ?", collectionID)
+	tx = scopeByUser(tx, userID, isAdmin)
+	if err := tx.Order("id ASC").Find(&items).Error; err != nil {
 		return nil, err
 	}
 
 	return items, nil
 }
 
-func UpdateItem(ctx context.Context, userID uint, id int, name string, price float64, collectionID int, bin *BinaryObjectPayload) (models.Item, error) {
+func UpdateItem(ctx context.Context, userID uint, isAdmin bool, id int, name string, price float64, collectionID int, bin *BinaryObjectPayload) (models.Item, error) {
 	if itemDB == nil {
 		return models.Item{}, errors.New("conexão com o banco não inicializada")
 	}
 
 	var item models.Item
-	if err := itemDB.WithContext(ctx).
-		Where("id = ? AND user_id = ?", id, userID).
-		First(&item).Error; err != nil {
+	tx := scopeByUser(itemDB.WithContext(ctx), userID, isAdmin)
+	if err := tx.Where("id = ?", id).First(&item).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return models.Item{}, ErrNotFound
 		}
 		return models.Item{}, err
 	}
 
-	owns, err := CollectionBelongsToUser(ctx, userID, collectionID)
+	owns, err := CollectionAccessible(ctx, userID, isAdmin, collectionID)
 	if err != nil {
 		return models.Item{}, err
 	}
@@ -140,15 +139,14 @@ func UpdateItem(ctx context.Context, userID uint, id int, name string, price flo
 	return item, nil
 }
 
-func DeleteItem(ctx context.Context, userID uint, id int) error {
+func DeleteItem(ctx context.Context, userID uint, isAdmin bool, id int) error {
 	if itemDB == nil {
 		return errors.New("conexão com o banco não inicializada")
 	}
 
 	var item models.Item
-	if err := itemDB.WithContext(ctx).
-		Where("id = ? AND user_id = ?", id, userID).
-		First(&item).Error; err != nil {
+	tx := scopeByUser(itemDB.WithContext(ctx), userID, isAdmin)
+	if err := tx.Where("id = ?", id).First(&item).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrNotFound
 		}

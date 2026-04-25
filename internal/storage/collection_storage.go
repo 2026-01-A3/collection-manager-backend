@@ -23,12 +23,12 @@ type BinaryObjectPayload struct {
 	Extension string
 }
 
-func AddCollection(ctx context.Context, userID uint, name string, categoryID int, bin *BinaryObjectPayload) (models.Collection, error) {
+func AddCollection(ctx context.Context, userID uint, isAdmin bool, name string, categoryID int, bin *BinaryObjectPayload) (models.Collection, error) {
 	if collectionDB == nil {
 		return models.Collection{}, errors.New("conexão com o banco não inicializada")
 	}
 
-	owns, err := CategoryBelongsToUser(ctx, userID, categoryID)
+	owns, err := CategoryAccessible(ctx, userID, isAdmin, categoryID)
 	if err != nil {
 		return models.Collection{}, err
 	}
@@ -64,41 +64,39 @@ func AddCollection(ctx context.Context, userID uint, name string, categoryID int
 	return collection, nil
 }
 
-func GetCollections(ctx context.Context, userID uint) ([]models.Collection, error) {
+func GetCollections(ctx context.Context, userID uint, isAdmin bool) ([]models.Collection, error) {
 	if collectionDB == nil {
 		return nil, errors.New("conexão com o banco não inicializada")
 	}
 
 	var collections []models.Collection
 
-	if err := collectionDB.WithContext(ctx).
+	tx := scopeByUser(collectionDB.WithContext(ctx), userID, isAdmin).
 		Preload("Category").
 		Preload("BinaryObject").
-		Where("user_id = ?", userID).
-		Order("id ASC").
-		Find(&collections).Error; err != nil {
+		Order("id ASC")
+	if err := tx.Find(&collections).Error; err != nil {
 		return nil, err
 	}
 
 	return collections, nil
 }
 
-func UpdateCollection(ctx context.Context, userID uint, id int, name string, categoryID int, bin *BinaryObjectPayload) (models.Collection, error) {
+func UpdateCollection(ctx context.Context, userID uint, isAdmin bool, id int, name string, categoryID int, bin *BinaryObjectPayload) (models.Collection, error) {
 	if collectionDB == nil {
 		return models.Collection{}, errors.New("conexão com o banco não inicializada")
 	}
 
 	var collection models.Collection
-	if err := collectionDB.WithContext(ctx).
-		Where("id = ? AND user_id = ?", id, userID).
-		First(&collection).Error; err != nil {
+	tx := scopeByUser(collectionDB.WithContext(ctx), userID, isAdmin)
+	if err := tx.Where("id = ?", id).First(&collection).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return models.Collection{}, ErrNotFound
 		}
 		return models.Collection{}, err
 	}
 
-	owns, err := CategoryBelongsToUser(ctx, userID, categoryID)
+	owns, err := CategoryAccessible(ctx, userID, isAdmin, categoryID)
 	if err != nil {
 		return models.Collection{}, err
 	}
@@ -139,15 +137,14 @@ func UpdateCollection(ctx context.Context, userID uint, id int, name string, cat
 	return collection, nil
 }
 
-func DeleteCollection(ctx context.Context, userID uint, id int) error {
+func DeleteCollection(ctx context.Context, userID uint, isAdmin bool, id int) error {
 	if collectionDB == nil {
 		return errors.New("conexão com o banco não inicializada")
 	}
 
 	var collection models.Collection
-	if err := collectionDB.WithContext(ctx).
-		Where("id = ? AND user_id = ?", id, userID).
-		First(&collection).Error; err != nil {
+	tx := scopeByUser(collectionDB.WithContext(ctx), userID, isAdmin)
+	if err := tx.Where("id = ?", id).First(&collection).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrNotFound
 		}
@@ -169,18 +166,14 @@ func DeleteCollection(ctx context.Context, userID uint, id int) error {
 	return nil
 }
 
-// CollectionBelongsToUser verifica se uma coleção pertence ao usuário.
-// Usado para validar FK ao criar/atualizar itens.
-func CollectionBelongsToUser(ctx context.Context, userID uint, collectionID int) (bool, error) {
+func CollectionAccessible(ctx context.Context, userID uint, isAdmin bool, collectionID int) (bool, error) {
 	if collectionDB == nil {
 		return false, errors.New("conexão com o banco não inicializada")
 	}
 
 	var count int64
-	if err := collectionDB.WithContext(ctx).
-		Model(&models.Collection{}).
-		Where("id = ? AND user_id = ?", collectionID, userID).
-		Count(&count).Error; err != nil {
+	tx := scopeByUser(collectionDB.WithContext(ctx).Model(&models.Collection{}), userID, isAdmin)
+	if err := tx.Where("id = ?", collectionID).Count(&count).Error; err != nil {
 		return false, err
 	}
 

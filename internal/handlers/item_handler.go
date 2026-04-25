@@ -25,7 +25,7 @@ type UpdateItemInput struct {
 }
 
 func CreateItem(c *gin.Context) {
-	userID, ok := userIDFromContext(c)
+	userID, isAdmin, ok := actorFromContext(c)
 	if !ok {
 		return
 	}
@@ -36,7 +36,7 @@ func CreateItem(c *gin.Context) {
 		return
 	}
 
-	item, err := storage.AddItem(c.Request.Context(), userID, input.Name, input.Price, input.CollectionID, toPayload(input.BinaryObject))
+	item, err := storage.AddItem(c.Request.Context(), userID, isAdmin, input.Name, input.Price, input.CollectionID, toPayload(input.BinaryObject))
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Coleção não encontrada"})
@@ -50,7 +50,7 @@ func CreateItem(c *gin.Context) {
 }
 
 func GetItemsByCollection(c *gin.Context) {
-	userID, ok := userIDFromContext(c)
+	userID, isAdmin, ok := actorFromContext(c)
 	if !ok {
 		return
 	}
@@ -62,7 +62,7 @@ func GetItemsByCollection(c *gin.Context) {
 		return
 	}
 
-	items, err := storage.GetItemsByCollection(c.Request.Context(), userID, collectionID)
+	items, err := storage.GetItemsByCollection(c.Request.Context(), userID, isAdmin, collectionID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Coleção não encontrada"})
@@ -76,7 +76,7 @@ func GetItemsByCollection(c *gin.Context) {
 }
 
 func UpdateItem(c *gin.Context) {
-	userID, ok := userIDFromContext(c)
+	userID, isAdmin, ok := actorFromContext(c)
 	if !ok {
 		return
 	}
@@ -94,7 +94,7 @@ func UpdateItem(c *gin.Context) {
 		return
 	}
 
-	item, err := storage.UpdateItem(c.Request.Context(), userID, id, input.Name, input.Price, input.CollectionID, toPayload(input.BinaryObject))
+	item, err := storage.UpdateItem(c.Request.Context(), userID, isAdmin, id, input.Name, input.Price, input.CollectionID, toPayload(input.BinaryObject))
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Item ou coleção não encontrada"})
@@ -108,7 +108,7 @@ func UpdateItem(c *gin.Context) {
 }
 
 func DeleteItem(c *gin.Context) {
-	userID, ok := userIDFromContext(c)
+	userID, isAdmin, ok := actorFromContext(c)
 	if !ok {
 		return
 	}
@@ -120,7 +120,7 @@ func DeleteItem(c *gin.Context) {
 		return
 	}
 
-	if err := storage.DeleteItem(c.Request.Context(), userID, id); err != nil {
+	if err := storage.DeleteItem(c.Request.Context(), userID, isAdmin, id); err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Item não encontrado"})
 			return

@@ -15,7 +15,7 @@ type CreateCategoryInput struct {
 }
 
 func CreateCategory(c *gin.Context) {
-	userID, ok := userIDFromContext(c)
+	userID, _, ok := actorFromContext(c)
 	if !ok {
 		return
 	}
@@ -36,12 +36,12 @@ func CreateCategory(c *gin.Context) {
 }
 
 func GetCategories(c *gin.Context) {
-	userID, ok := userIDFromContext(c)
+	userID, isAdmin, ok := actorFromContext(c)
 	if !ok {
 		return
 	}
 
-	categories, err := storage.GetCategories(c.Request.Context(), userID)
+	categories, err := storage.GetCategories(c.Request.Context(), userID, isAdmin)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar categorias"})
 		return
@@ -55,7 +55,7 @@ type UpdateCategoryInput struct {
 }
 
 func UpdateCategory(c *gin.Context) {
-	userID, ok := userIDFromContext(c)
+	userID, isAdmin, ok := actorFromContext(c)
 	if !ok {
 		return
 	}
@@ -73,7 +73,7 @@ func UpdateCategory(c *gin.Context) {
 		return
 	}
 
-	category, err := storage.UpdateCategory(c.Request.Context(), userID, id, input.Name)
+	category, err := storage.UpdateCategory(c.Request.Context(), userID, isAdmin, id, input.Name)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Categoria não encontrada"})
@@ -87,7 +87,7 @@ func UpdateCategory(c *gin.Context) {
 }
 
 func DeleteCategory(c *gin.Context) {
-	userID, ok := userIDFromContext(c)
+	userID, isAdmin, ok := actorFromContext(c)
 	if !ok {
 		return
 	}
@@ -99,7 +99,7 @@ func DeleteCategory(c *gin.Context) {
 		return
 	}
 
-	if err := storage.DeleteCategory(c.Request.Context(), userID, id); err != nil {
+	if err := storage.DeleteCategory(c.Request.Context(), userID, isAdmin, id); err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Categoria não encontrada"})
 			return
