@@ -1,6 +1,7 @@
-﻿package handlers
+package handlers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -14,20 +15,20 @@ type CreateCategoryInput struct {
 }
 
 func CreateCategory(c *gin.Context) {
-	var input CreateCategoryInput
-
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid request",
-		})
+	userID, ok := userIDFromContext(c)
+	if !ok {
 		return
 	}
 
-	category, err := storage.AddCategory(c.Request.Context(), input.Name)
+	var input CreateCategoryInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	category, err := storage.AddCategory(c.Request.Context(), userID, input.Name)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Erro ao salvar categoria",
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao salvar categoria"})
 		return
 	}
 
@@ -35,11 +36,14 @@ func CreateCategory(c *gin.Context) {
 }
 
 func GetCategories(c *gin.Context) {
-	categories, err := storage.GetCategories(c.Request.Context())
+	userID, ok := userIDFromContext(c)
+	if !ok {
+		return
+	}
+
+	categories, err := storage.GetCategories(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Erro ao buscar categorias",
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar categorias"})
 		return
 	}
 
@@ -51,28 +55,31 @@ type UpdateCategoryInput struct {
 }
 
 func UpdateCategory(c *gin.Context) {
+	userID, ok := userIDFromContext(c)
+	if !ok {
+		return
+	}
+
 	idParam := c.Param("id")
 	id := 0
 	if _, err := fmt.Sscanf(idParam, "%d", &id); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "ID inválido",
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
 		return
 	}
 
 	var input UpdateCategoryInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid request",
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
 		return
 	}
 
-	category, err := storage.UpdateCategory(c.Request.Context(), id, input.Name)
+	category, err := storage.UpdateCategory(c.Request.Context(), userID, id, input.Name)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Erro ao atualizar categoria",
-		})
+		if errors.Is(err, storage.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Categoria não encontrada"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar categoria"})
 		return
 	}
 
@@ -80,24 +87,26 @@ func UpdateCategory(c *gin.Context) {
 }
 
 func DeleteCategory(c *gin.Context) {
+	userID, ok := userIDFromContext(c)
+	if !ok {
+		return
+	}
+
 	idParam := c.Param("id")
 	id := 0
 	if _, err := fmt.Sscanf(idParam, "%d", &id); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "ID inválido",
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
 		return
 	}
 
-	err := storage.DeleteCategory(c.Request.Context(), id)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Erro ao deletar categoria",
-		})
+	if err := storage.DeleteCategory(c.Request.Context(), userID, id); err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Categoria não encontrada"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao deletar categoria"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Categoria deletada com sucesso",
-	})
+	c.JSON(http.StatusOK, gin.H{"message": "Categoria deletada com sucesso"})
 }

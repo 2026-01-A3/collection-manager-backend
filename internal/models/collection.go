@@ -5,6 +5,7 @@ type Collection struct {
 	Name           string        `json:"name" gorm:"not null"`
 	CategoryID     int           `json:"category_id" gorm:"not null"`
 	Category       Category      `json:"category" gorm:"foreignKey:CategoryID"`
+	UserID         uint          `json:"user_id" gorm:"not null;index"`
 	BinaryObjectID *int          `json:"binary_object_id"`
 	BinaryObject   *BinaryObject `json:"binary_object,omitempty" gorm:"foreignKey:BinaryObjectID"`
 }

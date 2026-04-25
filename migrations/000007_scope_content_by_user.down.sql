@@ -1,0 +1,3 @@
+ALTER TABLE items       DROP COLUMN IF EXISTS user_id;
+ALTER TABLE collections DROP COLUMN IF EXISTS user_id;
+ALTER TABLE categories  DROP COLUMN IF EXISTS user_id;

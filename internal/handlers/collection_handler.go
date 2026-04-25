@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -33,20 +34,24 @@ func toPayload(in *BinaryObjectInput) *storage.BinaryObjectPayload {
 }
 
 func CreateCollection(c *gin.Context) {
-	var input CreateCollectionInput
-
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid request",
-		})
+	userID, ok := userIDFromContext(c)
+	if !ok {
 		return
 	}
 
-	collection, err := storage.AddCollection(c.Request.Context(), input.Name, input.CategoryID, toPayload(input.BinaryObject))
+	var input CreateCollectionInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	collection, err := storage.AddCollection(c.Request.Context(), userID, input.Name, input.CategoryID, toPayload(input.BinaryObject))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Erro ao salvar coleção",
-		})
+		if errors.Is(err, storage.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Categoria não encontrada"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao salvar coleção"})
 		return
 	}
 
@@ -54,11 +59,14 @@ func CreateCollection(c *gin.Context) {
 }
 
 func GetCollections(c *gin.Context) {
-	collections, err := storage.GetCollections(c.Request.Context())
+	userID, ok := userIDFromContext(c)
+	if !ok {
+		return
+	}
+
+	collections, err := storage.GetCollections(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Erro ao buscar coleções",
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar coleções"})
 		return
 	}
 
@@ -72,28 +80,31 @@ type UpdateCollectionInput struct {
 }
 
 func UpdateCollection(c *gin.Context) {
+	userID, ok := userIDFromContext(c)
+	if !ok {
+		return
+	}
+
 	idParam := c.Param("id")
 	id := 0
 	if _, err := fmt.Sscanf(idParam, "%d", &id); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "ID inválido",
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
 		return
 	}
 
 	var input UpdateCollectionInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid request",
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
 		return
 	}
 
-	collection, err := storage.UpdateCollection(c.Request.Context(), id, input.Name, input.CategoryID, toPayload(input.BinaryObject))
+	collection, err := storage.UpdateCollection(c.Request.Context(), userID, id, input.Name, input.CategoryID, toPayload(input.BinaryObject))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Erro ao atualizar coleção",
-		})
+		if errors.Is(err, storage.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Coleção ou categoria não encontrada"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar coleção"})
 		return
 	}
 
@@ -101,24 +112,26 @@ func UpdateCollection(c *gin.Context) {
 }
 
 func DeleteCollection(c *gin.Context) {
+	userID, ok := userIDFromContext(c)
+	if !ok {
+		return
+	}
+
 	idParam := c.Param("id")
 	id := 0
 	if _, err := fmt.Sscanf(idParam, "%d", &id); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "ID inválido",
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
 		return
 	}
 
-	err := storage.DeleteCollection(c.Request.Context(), id)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Erro ao deletar coleção",
-		})
+	if err := storage.DeleteCollection(c.Request.Context(), userID, id); err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Coleção não encontrada"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao deletar coleção"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Coleção deletada com sucesso",
-	})
+	c.JSON(http.StatusOK, gin.H{"message": "Coleção deletada com sucesso"})
 }
