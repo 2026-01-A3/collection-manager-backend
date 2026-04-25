@@ -59,7 +59,10 @@ func main() {
 	router := gin.Default()
 
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:4200, https://collection-manager-frontend.onrender.com"},
+		AllowOrigins: []string{
+			"http://localhost:4200",
+			"https://collection-manager-frontend.onrender.com",
+		},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
