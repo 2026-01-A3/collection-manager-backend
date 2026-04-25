@@ -34,7 +34,7 @@ func toPayload(in *BinaryObjectInput) *storage.BinaryObjectPayload {
 }
 
 func CreateCollection(c *gin.Context) {
-	userID, ok := userIDFromContext(c)
+	userID, isAdmin, ok := actorFromContext(c)
 	if !ok {
 		return
 	}
@@ -45,7 +45,7 @@ func CreateCollection(c *gin.Context) {
 		return
 	}
 
-	collection, err := storage.AddCollection(c.Request.Context(), userID, input.Name, input.CategoryID, toPayload(input.BinaryObject))
+	collection, err := storage.AddCollection(c.Request.Context(), userID, isAdmin, input.Name, input.CategoryID, toPayload(input.BinaryObject))
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Categoria não encontrada"})
@@ -59,12 +59,12 @@ func CreateCollection(c *gin.Context) {
 }
 
 func GetCollections(c *gin.Context) {
-	userID, ok := userIDFromContext(c)
+	userID, isAdmin, ok := actorFromContext(c)
 	if !ok {
 		return
 	}
 
-	collections, err := storage.GetCollections(c.Request.Context(), userID)
+	collections, err := storage.GetCollections(c.Request.Context(), userID, isAdmin)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar coleções"})
 		return
@@ -80,7 +80,7 @@ type UpdateCollectionInput struct {
 }
 
 func UpdateCollection(c *gin.Context) {
-	userID, ok := userIDFromContext(c)
+	userID, isAdmin, ok := actorFromContext(c)
 	if !ok {
 		return
 	}
@@ -98,7 +98,7 @@ func UpdateCollection(c *gin.Context) {
 		return
 	}
 
-	collection, err := storage.UpdateCollection(c.Request.Context(), userID, id, input.Name, input.CategoryID, toPayload(input.BinaryObject))
+	collection, err := storage.UpdateCollection(c.Request.Context(), userID, isAdmin, id, input.Name, input.CategoryID, toPayload(input.BinaryObject))
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Coleção ou categoria não encontrada"})
@@ -112,7 +112,7 @@ func UpdateCollection(c *gin.Context) {
 }
 
 func DeleteCollection(c *gin.Context) {
-	userID, ok := userIDFromContext(c)
+	userID, isAdmin, ok := actorFromContext(c)
 	if !ok {
 		return
 	}
@@ -124,7 +124,7 @@ func DeleteCollection(c *gin.Context) {
 		return
 	}
 
-	if err := storage.DeleteCollection(c.Request.Context(), userID, id); err != nil {
+	if err := storage.DeleteCollection(c.Request.Context(), userID, isAdmin, id); err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Coleção não encontrada"})
 			return

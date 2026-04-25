@@ -17,6 +17,13 @@ func InitCategoryStorage(db *gorm.DB) error {
 	return categoryDB.AutoMigrate(&models.Category{})
 }
 
+func scopeByUser(tx *gorm.DB, userID uint, isAdmin bool) *gorm.DB {
+	if isAdmin {
+		return tx
+	}
+	return tx.Where("user_id = ?", userID)
+}
+
 func AddCategory(ctx context.Context, userID uint, name string) (models.Category, error) {
 	if categoryDB == nil {
 		return models.Category{}, errors.New("conexão com o banco não inicializada")
@@ -34,32 +41,29 @@ func AddCategory(ctx context.Context, userID uint, name string) (models.Category
 	return category, nil
 }
 
-func GetCategories(ctx context.Context, userID uint) ([]models.Category, error) {
+func GetCategories(ctx context.Context, userID uint, isAdmin bool) ([]models.Category, error) {
 	if categoryDB == nil {
 		return nil, errors.New("conexão com o banco não inicializada")
 	}
 
 	var categories []models.Category
 
-	if err := categoryDB.WithContext(ctx).
-		Where("user_id = ?", userID).
-		Order("id ASC").
-		Find(&categories).Error; err != nil {
+	tx := scopeByUser(categoryDB.WithContext(ctx), userID, isAdmin)
+	if err := tx.Order("id ASC").Find(&categories).Error; err != nil {
 		return nil, err
 	}
 
 	return categories, nil
 }
 
-func UpdateCategory(ctx context.Context, userID uint, id int, name string) (models.Category, error) {
+func UpdateCategory(ctx context.Context, userID uint, isAdmin bool, id int, name string) (models.Category, error) {
 	if categoryDB == nil {
 		return models.Category{}, errors.New("conexão com o banco não inicializada")
 	}
 
 	var category models.Category
-	if err := categoryDB.WithContext(ctx).
-		Where("id = ? AND user_id = ?", id, userID).
-		First(&category).Error; err != nil {
+	tx := scopeByUser(categoryDB.WithContext(ctx), userID, isAdmin)
+	if err := tx.Where("id = ?", id).First(&category).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return models.Category{}, ErrNotFound
 		}
@@ -74,15 +78,14 @@ func UpdateCategory(ctx context.Context, userID uint, id int, name string) (mode
 	return category, nil
 }
 
-func DeleteCategory(ctx context.Context, userID uint, id int) error {
+func DeleteCategory(ctx context.Context, userID uint, isAdmin bool, id int) error {
 	if categoryDB == nil {
 		return errors.New("conexão com o banco não inicializada")
 	}
 
 	var category models.Category
-	if err := categoryDB.WithContext(ctx).
-		Where("id = ? AND user_id = ?", id, userID).
-		First(&category).Error; err != nil {
+	tx := scopeByUser(categoryDB.WithContext(ctx), userID, isAdmin)
+	if err := tx.Where("id = ?", id).First(&category).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrNotFound
 		}
@@ -96,18 +99,14 @@ func DeleteCategory(ctx context.Context, userID uint, id int) error {
 	return nil
 }
 
-// CategoryBelongsToUser verifica se uma categoria pertence ao usuário.
-// Usado para validar FK ao criar/atualizar coleções.
-func CategoryBelongsToUser(ctx context.Context, userID uint, categoryID int) (bool, error) {
+func CategoryAccessible(ctx context.Context, userID uint, isAdmin bool, categoryID int) (bool, error) {
 	if categoryDB == nil {
 		return false, errors.New("conexão com o banco não inicializada")
 	}
 
 	var count int64
-	if err := categoryDB.WithContext(ctx).
-		Model(&models.Category{}).
-		Where("id = ? AND user_id = ?", categoryID, userID).
-		Count(&count).Error; err != nil {
+	tx := scopeByUser(categoryDB.WithContext(ctx).Model(&models.Category{}), userID, isAdmin)
+	if err := tx.Where("id = ?", categoryID).Count(&count).Error; err != nil {
 		return false, err
 	}
 
