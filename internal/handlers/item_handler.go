@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -24,20 +25,24 @@ type UpdateItemInput struct {
 }
 
 func CreateItem(c *gin.Context) {
-	var input CreateItemInput
-
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid request",
-		})
+	userID, ok := userIDFromContext(c)
+	if !ok {
 		return
 	}
 
-	item, err := storage.AddItem(c.Request.Context(), input.Name, input.Price, input.CollectionID, toPayload(input.BinaryObject))
+	var input CreateItemInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	item, err := storage.AddItem(c.Request.Context(), userID, input.Name, input.Price, input.CollectionID, toPayload(input.BinaryObject))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Erro ao salvar item",
-		})
+		if errors.Is(err, storage.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Coleção não encontrada"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao salvar item"})
 		return
 	}
 
@@ -45,20 +50,25 @@ func CreateItem(c *gin.Context) {
 }
 
 func GetItemsByCollection(c *gin.Context) {
-	idParam := c.Query("collection_id")
-	collectionID := 0
-	if _, err := fmt.Sscanf(idParam, "%d", &collectionID); err != nil || collectionID == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "collection_id inválido",
-		})
+	userID, ok := userIDFromContext(c)
+	if !ok {
 		return
 	}
 
-	items, err := storage.GetItemsByCollection(c.Request.Context(), collectionID)
+	idParam := c.Query("collection_id")
+	collectionID := 0
+	if _, err := fmt.Sscanf(idParam, "%d", &collectionID); err != nil || collectionID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "collection_id inválido"})
+		return
+	}
+
+	items, err := storage.GetItemsByCollection(c.Request.Context(), userID, collectionID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Erro ao buscar itens",
-		})
+		if errors.Is(err, storage.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Coleção não encontrada"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar itens"})
 		return
 	}
 
@@ -66,28 +76,31 @@ func GetItemsByCollection(c *gin.Context) {
 }
 
 func UpdateItem(c *gin.Context) {
+	userID, ok := userIDFromContext(c)
+	if !ok {
+		return
+	}
+
 	idParam := c.Param("id")
 	id := 0
 	if _, err := fmt.Sscanf(idParam, "%d", &id); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "ID inválido",
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
 		return
 	}
 
 	var input UpdateItemInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid request",
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
 		return
 	}
 
-	item, err := storage.UpdateItem(c.Request.Context(), id, input.Name, input.Price, input.CollectionID, toPayload(input.BinaryObject))
+	item, err := storage.UpdateItem(c.Request.Context(), userID, id, input.Name, input.Price, input.CollectionID, toPayload(input.BinaryObject))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Erro ao atualizar item",
-		})
+		if errors.Is(err, storage.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Item ou coleção não encontrada"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar item"})
 		return
 	}
 
@@ -95,23 +108,26 @@ func UpdateItem(c *gin.Context) {
 }
 
 func DeleteItem(c *gin.Context) {
+	userID, ok := userIDFromContext(c)
+	if !ok {
+		return
+	}
+
 	idParam := c.Param("id")
 	id := 0
 	if _, err := fmt.Sscanf(idParam, "%d", &id); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "ID inválido",
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
 		return
 	}
 
-	if err := storage.DeleteItem(c.Request.Context(), id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Erro ao deletar item",
-		})
+	if err := storage.DeleteItem(c.Request.Context(), userID, id); err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Item não encontrado"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao deletar item"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Item deletado com sucesso",
-	})
+	c.JSON(http.StatusOK, gin.H{"message": "Item deletado com sucesso"})
 }
