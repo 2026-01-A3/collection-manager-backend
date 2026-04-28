@@ -22,9 +22,30 @@ func normalizeDescription(d *string) *string {
 	return &trimmed
 }
 
+func normalizeTags(tags []string) []string {
+	if len(tags) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(tags))
+	seen := make(map[string]struct{}, len(tags))
+	for _, t := range tags {
+		trimmed := strings.TrimSpace(t)
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		out = append(out, trimmed)
+	}
+	return out
+}
+
 type CreateItemInput struct {
 	Name         string             `json:"name" binding:"required"`
 	Description  *string            `json:"description"`
+	Tags         []string           `json:"tags"`
 	Price        float64            `json:"price"`
 	CollectionID int                `json:"collection_id" binding:"required"`
 	BinaryObject *BinaryObjectInput `json:"binary_object"`
@@ -33,6 +54,7 @@ type CreateItemInput struct {
 type UpdateItemInput struct {
 	Name         string             `json:"name" binding:"required"`
 	Description  *string            `json:"description"`
+	Tags         []string           `json:"tags"`
 	Price        float64            `json:"price"`
 	CollectionID int                `json:"collection_id" binding:"required"`
 	BinaryObject *BinaryObjectInput `json:"binary_object"`
@@ -50,7 +72,7 @@ func CreateItem(c *gin.Context) {
 		return
 	}
 
-	item, err := storage.AddItem(c.Request.Context(), userID, isAdmin, input.Name, normalizeDescription(input.Description), input.Price, input.CollectionID, toPayload(input.BinaryObject))
+	item, err := storage.AddItem(c.Request.Context(), userID, isAdmin, input.Name, normalizeDescription(input.Description), normalizeTags(input.Tags), input.Price, input.CollectionID, toPayload(input.BinaryObject))
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Coleção não encontrada"})
@@ -108,7 +130,7 @@ func UpdateItem(c *gin.Context) {
 		return
 	}
 
-	item, err := storage.UpdateItem(c.Request.Context(), userID, isAdmin, id, input.Name, normalizeDescription(input.Description), input.Price, input.CollectionID, toPayload(input.BinaryObject))
+	item, err := storage.UpdateItem(c.Request.Context(), userID, isAdmin, id, input.Name, normalizeDescription(input.Description), normalizeTags(input.Tags), input.Price, input.CollectionID, toPayload(input.BinaryObject))
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Item ou coleção não encontrada"})
