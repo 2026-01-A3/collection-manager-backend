@@ -17,7 +17,7 @@ func InitItemStorage(db *gorm.DB) error {
 	return itemDB.AutoMigrate(&models.Item{})
 }
 
-func AddItem(ctx context.Context, userID uint, isAdmin bool, name string, price float64, collectionID int, bin *BinaryObjectPayload) (models.Item, error) {
+func AddItem(ctx context.Context, userID uint, isAdmin bool, name string, description *string, price float64, collectionID int, bin *BinaryObjectPayload) (models.Item, error) {
 	if itemDB == nil {
 		return models.Item{}, errors.New("conexão com o banco não inicializada")
 	}
@@ -32,6 +32,7 @@ func AddItem(ctx context.Context, userID uint, isAdmin bool, name string, price 
 
 	item := models.Item{
 		Name:         name,
+		Description:  description,
 		Price:        price,
 		CollectionID: collectionID,
 		UserID:       userID,
@@ -84,7 +85,7 @@ func GetItemsByCollection(ctx context.Context, userID uint, isAdmin bool, collec
 	return items, nil
 }
 
-func UpdateItem(ctx context.Context, userID uint, isAdmin bool, id int, name string, price float64, collectionID int, bin *BinaryObjectPayload) (models.Item, error) {
+func UpdateItem(ctx context.Context, userID uint, isAdmin bool, id int, name string, description *string, price float64, collectionID int, bin *BinaryObjectPayload) (models.Item, error) {
 	if itemDB == nil {
 		return models.Item{}, errors.New("conexão com o banco não inicializada")
 	}
@@ -107,6 +108,7 @@ func UpdateItem(ctx context.Context, userID uint, isAdmin bool, id int, name str
 	}
 
 	item.Name = name
+	item.Description = description
 	item.Price = price
 	item.CollectionID = collectionID
 

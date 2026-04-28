@@ -4,14 +4,27 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"collection-manager-backend/internal/storage"
 
 	"github.com/gin-gonic/gin"
 )
 
+func normalizeDescription(d *string) *string {
+	if d == nil {
+		return nil
+	}
+	trimmed := strings.TrimSpace(*d)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
+}
+
 type CreateItemInput struct {
 	Name         string             `json:"name" binding:"required"`
+	Description  *string            `json:"description"`
 	Price        float64            `json:"price"`
 	CollectionID int                `json:"collection_id" binding:"required"`
 	BinaryObject *BinaryObjectInput `json:"binary_object"`
@@ -19,6 +32,7 @@ type CreateItemInput struct {
 
 type UpdateItemInput struct {
 	Name         string             `json:"name" binding:"required"`
+	Description  *string            `json:"description"`
 	Price        float64            `json:"price"`
 	CollectionID int                `json:"collection_id" binding:"required"`
 	BinaryObject *BinaryObjectInput `json:"binary_object"`
@@ -36,7 +50,7 @@ func CreateItem(c *gin.Context) {
 		return
 	}
 
-	item, err := storage.AddItem(c.Request.Context(), userID, isAdmin, input.Name, input.Price, input.CollectionID, toPayload(input.BinaryObject))
+	item, err := storage.AddItem(c.Request.Context(), userID, isAdmin, input.Name, normalizeDescription(input.Description), input.Price, input.CollectionID, toPayload(input.BinaryObject))
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Coleção não encontrada"})
@@ -94,7 +108,7 @@ func UpdateItem(c *gin.Context) {
 		return
 	}
 
-	item, err := storage.UpdateItem(c.Request.Context(), userID, isAdmin, id, input.Name, input.Price, input.CollectionID, toPayload(input.BinaryObject))
+	item, err := storage.UpdateItem(c.Request.Context(), userID, isAdmin, id, input.Name, normalizeDescription(input.Description), input.Price, input.CollectionID, toPayload(input.BinaryObject))
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Item ou coleção não encontrada"})
