@@ -3,11 +3,17 @@ package storage
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"collection-manager-backend/internal/models"
 
 	"gorm.io/gorm"
 )
+
+func escapeLikePattern(s string) string {
+	r := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+	return r.Replace(s)
+}
 
 var categoryDB *gorm.DB
 
@@ -41,7 +47,7 @@ func AddCategory(ctx context.Context, userID uint, name string) (models.Category
 	return category, nil
 }
 
-func GetCategories(ctx context.Context, userID uint, isAdmin bool) ([]models.Category, error) {
+func GetCategories(ctx context.Context, userID uint, isAdmin bool, search string) ([]models.Category, error) {
 	if categoryDB == nil {
 		return nil, errors.New("conexão com o banco não inicializada")
 	}
@@ -49,6 +55,10 @@ func GetCategories(ctx context.Context, userID uint, isAdmin bool) ([]models.Cat
 	var categories []models.Category
 
 	tx := scopeByUser(categoryDB.WithContext(ctx), userID, isAdmin)
+	if trimmed := strings.TrimSpace(search); trimmed != "" {
+		pattern := "%" + escapeLikePattern(trimmed) + "%"
+		tx = tx.Where("name ILIKE ?", pattern)
+	}
 	if err := tx.Order("id ASC").Find(&categories).Error; err != nil {
 		return nil, err
 	}

@@ -41,7 +41,8 @@ func GetCategories(c *gin.Context) {
 		return
 	}
 
-	categories, err := storage.GetCategories(c.Request.Context(), userID, isAdmin)
+	search := c.Query("search")
+	categories, err := storage.GetCategories(c.Request.Context(), userID, isAdmin, search)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar categorias"})
 		return
