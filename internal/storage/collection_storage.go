@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"collection-manager-backend/internal/models"
 
@@ -64,7 +65,7 @@ func AddCollection(ctx context.Context, userID uint, isAdmin bool, name string, 
 	return collection, nil
 }
 
-func GetCollections(ctx context.Context, userID uint, isAdmin bool) ([]models.Collection, error) {
+func GetCollections(ctx context.Context, userID uint, isAdmin bool, search string) ([]models.Collection, error) {
 	if collectionDB == nil {
 		return nil, errors.New("conexão com o banco não inicializada")
 	}
@@ -73,9 +74,12 @@ func GetCollections(ctx context.Context, userID uint, isAdmin bool) ([]models.Co
 
 	tx := scopeByUser(collectionDB.WithContext(ctx), userID, isAdmin).
 		Preload("Category").
-		Preload("BinaryObject").
-		Order("id ASC")
-	if err := tx.Find(&collections).Error; err != nil {
+		Preload("BinaryObject")
+	if trimmed := strings.TrimSpace(search); trimmed != "" {
+		pattern := "%" + escapeLikePattern(trimmed) + "%"
+		tx = tx.Where("name ILIKE ?", pattern)
+	}
+	if err := tx.Order("id ASC").Find(&collections).Error; err != nil {
 		return nil, err
 	}
 
