@@ -64,7 +64,8 @@ func GetCollections(c *gin.Context) {
 		return
 	}
 
-	collections, err := storage.GetCollections(c.Request.Context(), userID, isAdmin)
+	search := c.Query("search")
+	collections, err := storage.GetCollections(c.Request.Context(), userID, isAdmin, search)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar coleções"})
 		return
